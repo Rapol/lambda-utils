@@ -1,0 +1,19 @@
+{
+  "extends": "airbnb-base",
+  "env": {
+    "mocha": true
+  },
+  "rules": {
+    "indent": ["error", 4, { "ImportDeclaration": 1 }],
+    "no-unused-vars": ["warn"],
+    "no-else-return": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/log.js", "src/env.js"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
+}
