@@ -1,33 +1,28 @@
 # Lambda Utils
 
 On our journey through serverless, we have found some common code base that we constantly bring
-over to every new serverless project. Here lies what we have used and improved for more than a year.
-
-WARNING: readme in internal WIP
+over to every new serverless project.
 
 ## Usage
 
 ### Lamba wrapper
 
-The lambda wrapper returns the handler function that AWS expects. It will run the user handler that you have defined in the routes file.
+Lambda wrapper lets us add reusable code that will be perform before and after your code runs. Instead of defining your handler alone,
+you will define the handler and wrap it with the lambda wrapper. The lambda wrapper helps you in:
+- Acquiring and releasing SQL connection during start up and tear down of each lambda call
+- Define a monolitc function that will handle multiple endpoints
+- Format request event (ie urlDecode request parameters)
+- Abstract return response to cloud provider
+- Standarize request logs
 
-handler.js
 ```
 import { lambdaWrapper } from 'lambda-utils';
 
-import routes from './routes';
-
-export default lambdaWrapper(routes, 'SERVICE_NAME', {
-    dbConnection: false,
-});
-```
-
-routes.js
-```
-export default {
-    '/accounts/:accountId/categories': {
+// define routes with their handlers and response
+const routes = {
+    '/users': {
         GET: {
-            handler: handlers.getCategories,
+            handler: handlers.getUsers,
             response: {
                 headers: {},
                 statusCode: 200,
@@ -35,41 +30,91 @@ export default {
         },
     }
 }
+
+// export a service called USER wrapped in the lambda wrapper
+export default lambdaWrapper(routes, 'USER');
 ```
 
-Lambda wrapper will pass event, context and a routeInfo object which is the json object
-defined in routes.js.
+#### Monolitc lambda router
 
-getCategories.js
+The lambda wrapper allows us to implement a [Service Pattern](https://serverless.com/blog/serverless-architecture-code-patterns/) very easily. In a Service Pattern, a single Lambda function can handle a few tasks that are usually related. For example, a user lambda would handle all routes under the /user path. The lambda wrapper provides the routing logic of the different handlers define in the service
+
+In the previous example, we have only defined one route. But we can define multiple routes to apply a monolitic pattern.
+
 ```
-function getCategories(_event, context, routeInfo) {
-    const FUNCTION_TAG = 'GET_CATEGORIES';
-    const event = Object.assign({}, _event);
-    log.debug(TAG, `${FUNCTION_TAG}_EVENT_INIT`);
-    return validateUser(event.pathParameters.accountId, event.requestContext.identity.cognitoIdentityId)
-        .then(() => categoryManager.getCategories(event.pathParameters.accountId))
-        .then((data) => {
-            log.kpi(TAG, `${FUNCTION_TAG}_EVENT_SUCCESS`, data);
-            const { statusCode } = routeInfo.response;
-            return {
-                statusCode,
-                headers: null,
-                body: {
-                    status: statusCode,
-                    data,
-                },
-            };
-        })
-        .catch((err) => {
-            log.error(TAG, `${FUNCTION_TAG}_EVENT_FAILURE`, {
-                pathParameters: event.pathParameters,
-                queryParameters: event.queryStringParameters,
-                body: event.body,
-            });
-            throw err;
-        });
+const routes = {
+    '/users': {
+        GET: {
+            handler: handlers.getUsers,
+            response: {
+                headers: {},
+                statusCode: 200,
+            },
+        },
+    }
+    '/users': {
+        POST: {
+            handler: handlers.createUser,
+            response: {
+                headers: {},
+                statusCode: 201,
+            },
+        },
+    }
 }
 ```
+
+Benefits of the Service Pattern: 
+- Less Lambda functions that you need to manage.
+- Some separation of concerns exists.
+- Teams can work autonomously.
+- Faster deployments.
+- Theoretically better performance. When multiple jobs are within a Lambda function, there is a higher likelihood that Lambda function will be called more regularly, which means the Lambda will stay warm and users will run into less cold-starts.
+
+#### Response
+
+The handler gets passed a routerInfo object that contains the static headers and status response for a successful response.
+
+```
+function users(event, context, routeInfo, connection) {
+    const { statusCode, headers } = routeInfo.response;
+    return {
+        statusCode,
+        headers,
+        body: {
+            status: statusCode,
+            data,
+        },
+    };
+}
+```
+
+#### SQL Connection
+
+The wrapper provides the ability to create and close SQL connections. To ask for a SQL connection you must set the `dbConnection` option:
+
+```
+// SQL onnection will be passed as an argument to your function
+const getUsers = (event, context, routeInfo, connection) => console.log(connection);
+
+const routes = {
+    '/users': {
+        GET: {
+            handler: handlers.getUsers,
+            response: {
+                headers: {},
+                statusCode: 200,
+            },
+        },
+    }
+}
+export default lambdaWrapper(
+    routes, 'SERVICE_NAME', {
+    dbConnection: true,
+})
+```
+
+The wrapper always tries to close the connection, if it exists, even if the user didnt ask for it.
 
 ### ApiError
 
@@ -81,11 +126,11 @@ ApiError(nameOfError, payload, opt)
 
 ```
 throw new ApiError(
-    constants.API_ERRORS.categoryConflict.error,
+    constants.API_ERRORS.userConflict.error,
     {
         status: 409,
         error: 'Conflict',
-        message: 'Category with same name already exists',
+        message: 'User with same email already exists',
     }
 );
 ```
@@ -111,6 +156,8 @@ const rows = await getSqlConnection(connection => connection.query(
 const connection = await this.getSqlConnection();
 const result = await connection.query(sql, args);
 ```
+
+### Logger
 
 # Babel
 
