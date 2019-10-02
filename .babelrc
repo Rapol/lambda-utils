@@ -7,7 +7,8 @@
           "node": "8.10"
         },
         "shippedProposals": true,
-        "useBuiltIns": "usage"
+        "useBuiltIns": "usage",
+        "corejs": "3.0.0",
       }
     ]
   ],
