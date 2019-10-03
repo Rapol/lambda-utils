@@ -12,15 +12,15 @@ let CACHED_CONNECTION = null;
 /**
  * Returns a promise that returns a new connection if there was none or returns a cached connection.
  * It will return the same promise if a connection was already opened
- * @param {Boolean} [bRequireNewConnection] - True if we require a new connection.
+ * @param {Boolean} [requireNewConnection] - True if we require a new connection.
  * @throws {Object} - throws an error if connection fails to open
  * @return {Promise<Object>} - connection
  */
-function createConnection(bRequireNewConnection) {
-    if (bRequireNewConnection) {
+function createConnection(requireNewConnection) {
+    if (requireNewConnection) {
         return mysql.createConnection(DB_CONFIG).catch((err) => {
             log.error(TAG, 'createConnection', {
-                bRequireNewConnection,
+                requireNewConnection,
                 err,
             });
             throw err;
@@ -38,19 +38,19 @@ function createConnection(bRequireNewConnection) {
 /**
  * Creates a sql connection and executes the function with the connection as the first parameter
  * @param {Function} fn - function that is asking for a sql connection
- * @param {Boolean} [bRequireNewConnection] - True if we require a new connection.
+ * @param {Boolean} [requireNewConnection] - True if we require a new connection.
  * @return {Promise<Object>} - result of the fn
  */
-function getSqlConnection(fn, bRequireNewConnection) {
+function getSqlConnection(fn, { requireNewConnection }) {
     if (!DB_CONFIG) {
         DB_CONFIG = env.getDBConfig();
     }
     // If function is not passed, return the promise
     if (!fn) {
-        return createConnection(bRequireNewConnection);
+        return createConnection(requireNewConnection);
     }
     // If function is passed, called the fn by passing the connection
-    return createConnection(bRequireNewConnection).then(conn => fn(conn));
+    return createConnection(requireNewConnection).then(conn => fn(conn));
 }
 
 /**

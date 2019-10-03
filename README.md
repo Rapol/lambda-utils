@@ -1,7 +1,7 @@
 # Lambda Utils
 
 On our journey through serverless, we have found some common code base that we constantly bring
-over to every new serverless project.
+over to every new serverless project. The lambda-utils module exposes these in one package.
 
 ## Usage
 
@@ -34,6 +34,8 @@ const routes = {
 // export a service called USER wrapped in the lambda wrapper
 export default lambdaWrapper(routes, 'USER');
 ```
+
+NOTE: Lambda Wrapper only supports AWS Lambda
 
 #### Monolitc lambda router
 
@@ -109,12 +111,15 @@ const routes = {
     }
 }
 export default lambdaWrapper(
-    routes, 'SERVICE_NAME', {
-    dbConnection: true,
-})
+    routes,
+    'SERVICE_NAME',
+    {
+        dbConnection: true,
+    },
+);
 ```
 
-The wrapper always tries to close the connection, if it exists, even if the user didnt ask for it.
+The wrapper always tries to close the connection when your handler returns.
 
 ### ApiError
 
@@ -137,24 +142,53 @@ throw new ApiError(
 
 ### DB
 
+The DB module allows you to imperatively acquire a DB connection anywhere from your handler. The module caches the DB connection which
+will be close by the lambda wrapper. 
+
+Connection can be acquired in a callback or async method.
+
+Callback:
 ```
-import { log, db } from 'lambda-utils';
+import { db } from 'lambda-utils';
 
 const { getSqlConnection } = db;
 
-// pass connection to callback function
-const rows = await getSqlConnection(connection => connection.query(
+const rows = await getSqlConnection(async connection => {
+    const result = await connection.query(
     `SELECT *
     FROM account
     WHERE accountId = ?`,
     [accountId],
-));
+    );
+    return result;
+});
+```
 
-// OR
-
-// return connection object if no callback is specified
-const connection = await this.getSqlConnection();
+Async:
+```
+// return connection if no callback is specified
+const connection = await getSqlConnection();
 const result = await connection.query(sql, args);
+```
+
+You can also specify to get a new connnection in case you need to have multiple transactions. In this case, you will need to close the connection.
+
+```
+const { getSqlConnection, closeSqlConnection } = db;
+
+const connection = await getSqlConnection(null, { requireNewConnection: true });
+const result = await connection.query(sql, args);
+closeSqlConnection(connection);
+```
+
+The DB configuration is done by environment variables
+
+```
+process.env.DB_USER
+process.env.DB_PASSWORD
+process.env.DB_NAME
+process.env.DB_HOST
+process.env.DB_PORT
 ```
 
 ### Logger
