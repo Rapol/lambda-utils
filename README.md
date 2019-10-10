@@ -53,8 +53,6 @@ const routes = {
                 statusCode: 200,
             },
         },
-    }
-    '/users': {
         POST: {
             handler: handlers.createUser,
             response: {
@@ -62,7 +60,7 @@ const routes = {
                 statusCode: 201,
             },
         },
-    }
+    },
 }
 ```
 
@@ -93,11 +91,15 @@ function users(event, context, routeInfo, connection) {
 
 #### SQL Connection
 
-The wrapper provides the ability to create and close SQL connections. To ask for a SQL connection you must set the `dbConnection` option:
+The wrapper provides the ability to create and close SQL connections. To ask for a SQL connection you must set the `dbConnection` option to true:
 
 ```
-// SQL onnection will be passed as an argument to your function
-const getUsers = (event, context, routeInfo, connection) => console.log(connection);
+// SQL connection will be passed as an argument to your function
+const getUsers = async (event, context, routeInfo, connection) => {
+    const users = await connection.query('SELECT * FROM user);
+    // Don't need to close the connection, lambda wrapper will do it for you
+    return users;
+};
 
 const routes = {
     '/users': {
@@ -171,17 +173,17 @@ const connection = await getSqlConnection();
 const result = await connection.query(sql, args);
 ```
 
-You can also specify to get a new connnection in case you need to have multiple transactions. In this case, you will need to close the connection.
+You can also specify to get a new connnection instead of the cache one in case you need to have multiple transactions. When doing this you will need to close the connection.
 
 ```
 const { getSqlConnection, closeSqlConnection } = db;
 
 const connection = await getSqlConnection(null, { requireNewConnection: true });
 const result = await connection.query(sql, args);
-closeSqlConnection(connection);
+await closeSqlConnection(connection);
 ```
 
-The DB configuration is done by environment variables
+The DB credentials and configuration is done via environment variables
 
 ```
 process.env.DB_USER
@@ -190,6 +192,8 @@ process.env.DB_NAME
 process.env.DB_HOST
 process.env.DB_PORT
 ```
+
+NOTE: It only supports mysql
 
 ### Logger
 
